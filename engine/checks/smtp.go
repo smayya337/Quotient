@@ -1,33 +1,71 @@
 package checks
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net"
 	"net/smtp"
 	"os"
+	"slices"
 	"strings"
 	"time"
 )
+
+/// BEGIN SMTP AUTH LOGIN SUPPORT
+
+func PlainOrLoginAuth(username, password, host string) smtp.Auth {
+	return &plainOrLoginAuth{username: username, password: password, host: host}
+}
+
+type plainOrLoginAuth struct {
+	username   string
+	password   string
+	host       string
+	authMethod string
+}
+
+func (a *plainOrLoginAuth) Start(server *smtp.ServerInfo) (string, []byte, error) {
+	if !slices.Contains(server.Auth, "PLAIN") {
+		a.authMethod = "LOGIN"
+		return a.authMethod, nil, nil
+	} else {
+		a.authMethod = "PLAIN"
+		resp := []byte("\x00" + a.username + "\x00" + a.password)
+		return a.authMethod, resp, nil
+	}
+}
+
+func (a *plainOrLoginAuth) Next(fromServer []byte, more bool) ([]byte, error) {
+	if !more {
+		return nil, nil
+	}
+
+	if a.authMethod == "PLAIN" {
+		// We've already sent everything.
+		return nil, errors.New("unexpected server challenge")
+	}
+
+	switch {
+	case bytes.Equal(fromServer, []byte("Username:")):
+		return []byte(a.username), nil
+	case bytes.Equal(fromServer, []byte("Password:")):
+		return []byte(a.password), nil
+	default:
+		return nil, fmt.Errorf("unexpected server challenge: %s", fromServer)
+	}
+}
+
+/// END SMTP AUTH LOGIN SUPPORT
 
 type Smtp struct {
 	Service
 	Encrypted bool
 	Domain    string
 	Fortunes  []string
-}
-
-type unencryptedAuth struct {
-	smtp.Auth
-}
-
-func (a unencryptedAuth) Start(server *smtp.ServerInfo) (string, []byte, error) {
-	s := *server
-	s.TLS = true
-
-	return a.Auth.Start(&s)
 }
 
 func (c Smtp) Run(teamID uint, teamIdentifier string, resultsChan chan Result) {
@@ -83,7 +121,7 @@ func (c Smtp) Run(teamID uint, teamIdentifier string, resultsChan chan Result) {
 			return
 		}
 
-		auth := unencryptedAuth{smtp.PlainAuth("", username+c.Domain, password, c.Target)}
+		auth := PlainOrLoginAuth(username+c.Domain, password, c.Target)
 		// ***********************************************
 
 		if c.Domain != "" {
