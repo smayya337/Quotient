@@ -14,7 +14,8 @@ import (
 
 type Ftp struct {
 	Service
-	File []FtpFile
+	Domain string
+	File   []FtpFile
 }
 
 type FtpFile struct {
@@ -45,6 +46,9 @@ func (c Ftp) Run(teamID uint, teamIdentifier string, resultsChan chan Result) {
 				checkResult.Debug = err.Error()
 				response <- checkResult
 				return
+			}
+			if c.Domain != "" {
+				username = username + c.Domain
 			}
 		}
 		err = conn.Login(username, password)
