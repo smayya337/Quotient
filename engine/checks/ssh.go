@@ -20,6 +20,7 @@ type Ssh struct {
 	PrivKey     string `toml:",omitempty"`
 	BadAttempts int    `toml:",omitzero"`
 	Command     []commandData
+	Domain      string
 }
 
 type commandData struct {
@@ -39,6 +40,9 @@ func (c Ssh) Run(teamID uint, teamIdentifier string, resultsChan chan Result) {
 			checkResult.Debug = err.Error()
 			response <- checkResult
 			return
+		}
+		if c.Domain != "" {
+			username = username + c.Domain
 		}
 
 		config := &ssh.ClientConfig{
