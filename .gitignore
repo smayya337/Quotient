@@ -14,3 +14,6 @@ quotient
 
 /submissions/*
 !.gitkeep
+
+/.idea/*
+/.vscode/*
