@@ -67,8 +67,9 @@ func (c Imap) Run(teamID uint, teamIdentifier string, resultsChan chan Result) {
 			defer cl.Logout()
 
 			// List mailboxes
-			mailboxes := make(chan *imap.MailboxInfo, 10)
-			err = cl.List("", "*", mailboxes)
+			// mailboxes := make(chan *imap.MailboxInfo, 10)
+			things := []imap.StatusItem{imap.StatusUidNext, imap.StatusMessages}
+			_, err = cl.Status("INBOX", things)
 			if err != nil {
 				checkResult.Error = "listing mailboxes failed"
 				checkResult.Debug = err.Error()
@@ -76,12 +77,12 @@ func (c Imap) Run(teamID uint, teamIdentifier string, resultsChan chan Result) {
 				return
 			}
 			checkResult.Status = true
-			checkResult.Debug = "mailbox listed successfully with creds " + username + ":" + password
+			checkResult.Debug = "inbox status queried successfully with creds " + username + ":" + password
 			response <- checkResult
 			return
 		}
 		checkResult.Status = true
-		checkResult.Debug = "smtp server responded to request (anonymous)"
+		checkResult.Debug = "imap server responded to request (anonymous)"
 		response <- checkResult
 	}
 
